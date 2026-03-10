@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>School Life Dashboard 2026</title>
+    <style>
+        :root {
+            --primary: #3498db; --secondary: #2c3e50; --accent: #e74c3c;
+            --sun: #ff4d4d; --sat: #4d94ff; --bg: #f4f7f6; --white: #ffffff;
+            --today-border: #f1c40f; --base-font-size: 16px;
+        }
+
+        body { 
+            font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; 
+            font-size: var(--base-font-size); background: var(--bg); margin: 0; 
+            display: flex; height: 100vh; color: #333; overflow: hidden; 
+        }
+
+        .sidebar { 
+            width: 320px; background: var(--white); border-right: 1px solid #ddd; 
+            padding: 20px; display: flex; flex-direction: column; 
+            transition: 0.3s; z-index: 100; flex-shrink: 0;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); }
+            .sidebar.active { transform: translateX(0); box-shadow: 2px 0 10px rgba(0,0,0,0.2); }
+        }
+
+        .main-content { flex-grow: 1; padding: 20px; overflow-y: auto; position: relative; }
+
+        .mobile-nav {
+            display: none; background: var(--secondary); color: white;
+            padding: 10px; justify-content: space-between; align-items: center;
+        }
+        @media (max-width: 768px) {
+            .mobile-nav { display: flex; position: sticky; top: 0; z-index: 200; }
+            body { flex-direction: column; }
+        }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .calendar-day { 
+            aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; cursor: pointer; border-radius: 8px; font-size: 0.8em;
+        }
+        .is-holiday, .sun { color: var(--sun); font-weight: bold; }
+        .sat { color: var(--sat); }
+        .current-selection { background: var(--primary) !important; color: white !important; }
+        .is-today { border: 2px solid var(--today-border) !important; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
+        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
+        th { background: var(--secondary); color: white; }
+
+        .modal-overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: flex-start;
+            padding-top: 20px;
+        }
+        .modal { 
+            background: white; width: 90%; max-width: 500px; padding: 20px; 
+            border-radius: 12px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-small { padding: 5px 10px; font-size: 12px; background: #eee; margin-bottom: 10px; border-radius: 4px; }
+        .btn-del { background: #fee; color: #c33; padding: 0 10px; font-size: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+        .btn-main { background: var(--primary); color: white; width: 100%; margin-top: 10px; }
+        
+        .color-row { display: grid; grid-template-columns: 1fr 50px 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
+        input[type="text"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        input[type="color"] { width: 100%; height: 35px; border: none; padding: 0; cursor: pointer; background: none; }
+
+        .backup-section {
+            background: #f9f9f9; padding: 10px; border-radius: 8px; margin-top: 15px; border: 1px dashed #ccc;
+        }
+        .btn-outline { background: white; border: 1px solid #ddd; padding: 8px; font-size: 12px; margin-right: 5px; }
+
+        /* マニュアル用スタイル */
+        .manual-step { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
+        .manual-step h4 { margin: 0 0 5px 0; color: var(--primary); }
+        .manual-step p { margin: 0; font-size: 0.9em; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-nav">
+        <button class="btn" onclick="toggleSidebar()">☰ 📅</button>
+        <span id="mobile-date">2026年</span>
+        <button class="btn" onclick="openModal('manual-modal')">❓ ヘルプ</button>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <h3 style="margin:0 0 10px 0;">2026年 <select id="month-select" onchange="changeMonth()"></select></h3>
+        <div class="calendar-grid">
+            <div style="color:var(--sun);text-align:center;">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div style="color:var(--sat);text-align:center;">土</div>
+            <div id="calendar-days" style="display: contents;"></div>
+        </div>
+        <button class="btn btn-main" style="background:var(--secondary);" onclick="openModal('config-modal')">⚙ 基本時間割を登録</button>
+        <button class="btn btn-main" style="background:#555; margin-top:10px;" onclick="openModal('manual-modal')">📖 使い方マニュアル</button>
+        <button class="btn" style="margin-top:10px; background:#ddd;" onclick="openModal('settings-modal')">🎨 色とサイズの設定</button>
+    </div>
+
+    <div class="main-content">
+        <h2 id="view-date-label" style="margin-top:0;">日付を選択してください</h2>
+        <div id="workday-view">
+            <table>
+                <thead><tr><th style="width:15%">限</th><th style="width:35%">科目</th><th>メモ</th></tr></thead>
+                <tbody id="timetable-body"></tbody>
+            </table>
+            <button class="btn btn-main" onclick="openDayEditModal()">今日の予定を個別に編集</button>
+        </div>
+        <div id="holiday-view" style="display:none; padding:40px; background:white; border-radius:12px; text-align:center;">
+            <p id="holiday-memo" style="white-space: pre-wrap; font-size: 1.2em; font-weight: bold;"></p>
+            <button class="btn btn-main" onclick="openDayEditModal()">予定を編集</button>
+        </div>
+    </div>
+
+    <div id="manual-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>📖 使い方マニュアル</h3>
+            <div class="manual-step">
+                <h4>1. 基本の時間割を決める</h4>
+                <p>「⚙基本時間割を登録」から、月曜〜金曜のいつもの授業を入力して保存してください。</p>
+            </div>
+            <div class="manual-step">
+                <h4>2. 教科に色を付ける</h4>
+                <p>「🎨色とサイズの設定」で教科名を入力し、色を選択すると、時間割表に自動で色が付きます。枠が足りないときは「＋」で増やせます。</p>
+            </div>
+            <div class="manual-step">
+                <h4>3. 特定の日だけ予定を変える</h4>
+                <p>カレンダーの日付を選び、「今日の予定を個別に編集」を押すと、その日だけの短縮授業や持ち物を登録できます。休日の出校設定もここです。</p>
+            </div>
+            <div class="manual-step">
+                <h4>4. データを引き継ぐ</h4>
+                <p>「🎨設定」内の「データを保存」でファイルをダウンロードし、別のスマホなどで「データを読込」すれば、内容をそのまま移せます。</p>
+            </div>
+            <button class="btn btn-main" onclick="closeModal('manual-modal')">わかった！</button>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>🎨 カスタムカラー設定</h3>
+            <div id="color-inputs-area"></div>
+            <button class="btn btn-small" onclick="addSubjectSlot()">＋ 教科を追加</button>
+            <hr>
+            <div style="margin:10px 0;">文字サイズ: <select id="font-size-select"><option value="14px">小</option><option value="16px">中</option><option value="20px">大</option></select></div>
+            
+            <div class="backup-section">
+                <p style="margin:0 0 10px 0; font-size: 12px; color: #666;">データの同期・バックアップ</p>
+                <button class="btn btn-outline" onclick="exportData()">💾 データを保存(出力)</button>
+                <button class="btn btn-outline" onclick="triggerImport()">📂 データを読込(復元)</button>
+                <input type="file" id="import-file" style="display:none;" accept=".json" onchange="importData(this)">
+            </div>
+
+            <button class="btn btn-main" onclick="saveSettings()">保存して反映</button>
+            <button class="btn" style="width:100%; background:#eee; margin-top:5px;" onclick="closeModal('settings-modal')">閉じる</button>
+        </div>
+    </div>
+
+    <div id="config-modal" class="modal-overlay">
+        <div class="modal" style="max-width:95%;">
+            <h3>基本時間割 (月〜金)</h3>
+            <div id="config-grid-area" style="display:grid; grid-template-columns:30px repeat(5, 1fr); gap:5px;"></div>
+            <button class="btn btn-main" onclick="saveDefaultSettings()">保存して反映</button>
+            <button class="btn" style="width:100%; background:#eee; margin-top:5px;" onclick="closeModal('config-modal')">閉じる</button>
+        </div>
+    </div>
+
+    <div id="day-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>予定編集</h3>
+            <div style="background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:10px;">
+                <label><input type="checkbox" id="no-class-check"> 今日は授業なし</label>　
+                <label><input type="checkbox" id="force-work-check"> 休日出校</label>
+            </div>
+            <div id="day-edit-inputs"></div>
+            <textarea id="day-memo-input" style="width:100%; height:60px; margin-top:10px;" placeholder="メモ・持ち物など"></textarea>
+            <button class="btn btn-main" onclick="saveDaySettings()">保存して反映</button>
+            <button class="btn" style="width:100%; background:#eee; margin-top:5px;" onclick="closeModal('day-modal')">閉じる</button>
+        </div>
+    </div>
+
+    <script>
+        const holidays2026 = {"01-01":"元日","01-12":"成人の日","02-11":"建国記念の日","02-23":"天皇誕生日","03-20":"春分の日","04-29":"昭和の日","05-03":"憲法記念日","05-04":"みどりの日","05-05":"こどもの日","05-06":"振替休日","07-20":"海の日","08-11":"山の日","09-21":"敬老の日","09-22":"国民の休日","09-23":"秋分の日","10-12":"スポーツの日","11-03":"文化の日","11-23":"勤労感謝の日"};
+
+        let defaults = JSON.parse(localStorage.getItem('sc_defaults')) || {};
+        let specials = JSON.parse(localStorage.getItem('sc_specials')) || {};
+        let userSettings = JSON.parse(localStorage.getItem('sc_settings'));
+
+        if (!userSettings || !userSettings.customColors) {
+            userSettings = {
+                fontSize: '16px',
+                customColors: [{name: '', color: '#ffffff'}]
+            };
+        }
+
+        let selectedDate = "";
+        let currentMonth = new Date().getMonth() + 1;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initMonthSelect();
+            applySettings();
+            renderCalendar(2026, currentMonth);
+            const today = new Date();
+            const todayStr = `2026-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            selectDay(todayStr);
+        });
+
+        function initMonthSelect() {
+            const select = document.getElementById('month-select');
+            for(let i=1; i<=12; i++) {
+                const opt = document.createElement('option');
+                opt.value = i; opt.innerText = i + "月";
+                if(i === currentMonth) opt.selected = true;
+                select.appendChild(opt);
+            }
+        }
+
+        function applySettings() {
+            if (userSettings && userSettings.fontSize) {
+                document.documentElement.style.setProperty('--base-font-size', userSettings.fontSize);
+            }
+        }
+
+        function renderCalendar(y, m) {
+            const container = document.getElementById('calendar-days');
+            if (!container) return;
+            container.innerHTML = "";
+            const firstDay = new Date(y, m-1, 1).getDay();
+            const lastDate = new Date(y, m, 0).getDate();
+            for (let i = 0; i < firstDay; i++) container.innerHTML += `<div></div>`;
+            for (let d = 1; d <= lastDate; d++) {
+                const dateStr = `2026-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const div = document.createElement('div');
+                div.className = 'calendar-day';
+                div.id = `cal-${dateStr}`;
+                const dw = new Date(y, m-1, d).getDay();
+                if (dw === 0 || holidays2026[dateStr.slice(5)]) div.classList.add('is-holiday');
+                if (dw === 6) div.classList.add('sat');
+                div.innerHTML = `<span>${d}</span>`;
+                div.onclick = () => selectDay(dateStr);
+                container.appendChild(div);
+            }
+        }
+
+        function selectDay(dateStr) {
+            selectedDate = dateStr;
+            document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('current-selection'));
+            const target = document.getElementById(`cal-${dateStr}`);
+            if(target) target.classList.add('current-selection');
+            document.getElementById('view-date-label').innerText = dateStr;
+            const dw = new Date(dateStr).getDay();
+            const s = specials[dateStr] || {};
+            const isHol = !!holidays2026[dateStr.slice(5)];
+            const isRest = ((isHol || dw === 0 || dw === 6) && !s.forceWork) || s.noClass;
+
+            if (isRest) {
+                document.getElementById('workday-view').style.display = 'none';
+                document.getElementById('holiday-view').style.display = 'block';
+                document.getElementById('holiday-memo').innerText = (isHol ? `【${holidays2026[dateStr.slice(5)]}】\n` : "") + (s.holidayMemo || "予定なし");
+            } else {
+                document.getElementById('workday-view').style.display = 'block';
+                document.getElementById('holiday-view').style.display = 'none';
+                const tbody = document.getElementById('timetable-body');
+                tbody.innerHTML = "";
+                for (let h = 1; h <= 7; h++) {
+                    const sp = specials[selectedDate]?.hours?.[h];
+                    const base = (defaults[dw] && defaults[dw][h]) ? defaults[dw][h].subject : '-';
+                    const subject = (sp && sp.subject) ? sp.subject : base;
+                    let style = "";
+                    if (userSettings.customColors) {
+                        userSettings.customColors.forEach(cfg => {
+                            if (cfg && cfg.name && subject === cfg.name) {
+                                style = `background-color:${cfg.color}; color:white; font-weight:bold;`;
+                            }
+                        });
+                    }
+                    tbody.innerHTML += `<tr><td>${h}</td><td style="${style}">${subject}</td><td>${sp?.memo || ""}</td></tr>`;
+                }
+            }
+        }
+
+        function openModal(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = 'flex';
+                if(id === 'settings-modal') renderSettingsInputs();
+                if(id === 'config-modal') renderConfigGrid();
+            }
+        }
+
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        }
+
+        function renderSettingsInputs() {
+            const area = document.getElementById('color-inputs-area');
+            if (!area) return;
+            area.innerHTML = "";
+            userSettings.customColors.forEach((cfg, idx) => {
+                area.innerHTML += `<div class="color-row">
+                    <input type="text" id="name-${idx}" value="${cfg.name || ''}" placeholder="教科名">
+                    <input type="color" id="clr-${idx}" value="${cfg.color || '#ffffff'}">
+                    <button class="btn btn-del" onclick="removeSubjectSlot(${idx})">×</button>
+                </div>`;
+            });
+            document.getElementById('font-size-select').value = userSettings.fontSize;
+        }
+
+        function syncSettingsFromInputs() {
+            const size = document.getElementById('font-size-select').value;
+            const colors = [];
+            userSettings.customColors.forEach((_, idx) => {
+                const n = document.getElementById(`name-${idx}`);
+                const c = document.getElementById(`clr-${idx}`);
+                if (n && c) colors.push({ name: n.value, color: c.value });
+            });
+            userSettings = { fontSize: size, customColors: colors };
+        }
+
+        function addSubjectSlot() {
+            syncSettingsFromInputs();
+            userSettings.customColors.push({ name: '', color: '#ffffff' });
+            renderSettingsInputs();
+        }
+
+        function removeSubjectSlot(index) {
+            syncSettingsFromInputs();
+            userSettings.customColors.splice(index, 1);
+            if (userSettings.customColors.length === 0) userSettings.customColors.push({ name: '', color: '#ffffff' });
+            renderSettingsInputs();
+        }
+
+        function saveSettings() {
+            syncSettingsFromInputs();
+            localStorage.setItem('sc_settings', JSON.stringify(userSettings));
+            applySettings(); selectDay(selectedDate); closeModal('settings-modal');
+        }
+
+        function exportData() {
+            const allData = {
+                defaults: localStorage.getItem('sc_defaults'),
+                specials: localStorage.getItem('sc_specials'),
+                settings: localStorage.getItem('sc_settings')
+            };
+            const blob = new Blob([JSON.stringify(allData)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `school_dashboard_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function triggerImport() { document.getElementById('import-file').click(); }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.defaults) localStorage.setItem('sc_defaults', data.defaults);
+                    if (data.specials) localStorage.setItem('sc_specials', data.specials);
+                    if (data.settings) localStorage.setItem('sc_settings', data.settings);
+                    alert('データを読み込みました。再読み込みします。');
+                    location.reload();
+                } catch (err) { alert('ファイルの読み込みに失敗しました。'); }
+            };
+            reader.readAsText(file);
+        }
+
+        function renderConfigGrid() {
+            const area = document.getElementById('config-grid-area');
+            if (!area) return;
+            area.innerHTML = '<div></div>' + ['月','火','水','木','金'].map(d => `<div style="text-align:center;font-weight:bold">${d}</div>`).join('');
+            for (let h = 1; h <= 7; h++) {
+                area.innerHTML += `<div style="text-align:center;padding:5px;">${h}</div>`;
+                for (let dw = 1; dw <= 5; dw++) {
+                    const val = (defaults[dw] && defaults[dw][h]) ? defaults[dw][h].subject : '';
+                    area.innerHTML += `<input type="text" id="def-${dw}-${h}" style="width:100%;box-sizing:border-box;" value="${val}">`;
+                }
+            }
+        }
+
+        function saveDefaultSettings() {
+            for (let dw = 1; dw <= 5; dw++) {
+                defaults[dw] = {};
+                for (let h = 1; h <= 7; h++) {
+                    const el = document.getElementById(`def-${dw}-${h}`);
+                    defaults[dw][h] = { subject: el ? el.value : '' };
+                }
+            }
+            localStorage.setItem('sc_defaults', JSON.stringify(defaults));
+            selectDay(selectedDate); closeModal('config-modal');
+        }
+
+        function openDayEditModal() {
+            const area = document.getElementById('day-edit-inputs');
+            if (!area) return;
+            area.innerHTML = "";
+            const dw = new Date(selectedDate).getDay();
+            for (let h = 1; h <= 7; h++) {
+                const sp = (specials[selectedDate] && specials[selectedDate].hours) ? (specials[selectedDate].hours[h] || {}) : {};
+                const placeholder = (defaults[dw] && defaults[dw][h]) ? defaults[dw][h].subject : '教科';
+                area.innerHTML += `<div style="display:grid;grid-template-columns:30px 1fr 2fr;gap:5px;margin-bottom:5px;">
+                    <div>${h}</div><input type="text" id="sph-${h}" value="${sp.subject || ''}" placeholder="${placeholder}"><input type="text" id="spm-${h}" value="${sp.memo || ''}" placeholder="メモ"></div>`;
+            }
+            const s = specials[selectedDate] || {};
+            document.getElementById('no-class-check').checked = !!s.noClass;
+            document.getElementById('force-work-check').checked = !!s.forceWork;
+            document.getElementById('day-memo-input').value = s.holidayMemo || "";
+            openModal('day-modal');
+        }
+
+        function saveDaySettings() {
+            if (!specials[selectedDate]) specials[selectedDate] = {};
+            const s = specials[selectedDate];
+            s.noClass = document.getElementById('no-class-check').checked;
+            s.forceWork = document.getElementById('force-work-check').checked;
+            s.holidayMemo = document.getElementById('day-memo-input').value;
+            s.hours = {};
+            for (let h = 1; h <= 7; h++) {
+                const sub = document.getElementById(`sph-${h}`).value;
+                const mem = document.getElementById(`spm-${h}`).value;
+                if(sub || mem) s.hours[h] = { subject: sub, memo: mem };
+            }
+            localStorage.setItem('sc_specials', JSON.stringify(specials));
+            selectDay(selectedDate); closeModal('day-modal');
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
+        function changeMonth() { currentMonth = parseInt(document.getElementById('month-select').value); renderCalendar(2026, currentMonth); }
+    </script>
+</body>
+</html>
