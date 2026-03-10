@@ -39,14 +39,28 @@
             body { flex-direction: column; }
         }
 
+        /* カレンダーと「しるし」のスタイル */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
         .calendar-day { 
             aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; 
             justify-content: center; cursor: pointer; border-radius: 8px; font-size: 0.8em;
+            position: relative;
         }
+        /* しるし（ドット）の定義 */
+        .calendar-day.has-mark::after {
+            content: "";
+            position: absolute;
+            bottom: 4px;
+            width: 4px;
+            height: 4px;
+            background-color: var(--accent);
+            border-radius: 50%;
+        }
+
         .is-holiday, .sun { color: var(--sun); font-weight: bold; }
         .sat { color: var(--sat); }
         .current-selection { background: var(--primary) !important; color: white !important; }
+        .current-selection.has-mark::after { background-color: white; } /* 選択中は白ドットで見やすく */
         .is-today { border: 2px solid var(--today-border) !important; }
 
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
@@ -77,7 +91,6 @@
         }
         .btn-outline { background: white; border: 1px solid #ddd; padding: 8px; font-size: 12px; margin-right: 5px; }
 
-        /* マニュアル用スタイル */
         .manual-step { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .manual-step h4 { margin: 0 0 5px 0; color: var(--primary); }
         .manual-step p { margin: 0; font-size: 0.9em; line-height: 1.5; }
@@ -130,7 +143,7 @@
             </div>
             <div class="manual-step">
                 <h4>3. 特定の日だけ予定を変える</h4>
-                <p>カレンダーの日付を選び、「今日の予定を個別に編集」を押すと、その日だけの短縮授業や持ち物を登録できます。休日の出校設定もここです。</p>
+                <p>カレンダーの日付を選び、「今日の予定を個別に編集」を押すと、その日だけの短縮授業や持ち物を登録できます。予定がある日はカレンダーに<strong>赤いドット</strong>が付きます。</p>
             </div>
             <div class="manual-step">
                 <h4>4. データを引き継ぐ</h4>
@@ -225,6 +238,16 @@
             }
         }
 
+        // --- 変更がある日を判定するヘルパー ---
+        function hasDayMark(dateStr) {
+            const s = specials[dateStr];
+            if (!s) return false;
+            // 授業なし、休日出校、メモあり、または各時限に教科名かメモが入っている場合
+            const hasMemo = s.holidayMemo && s.holidayMemo.trim() !== "";
+            const hasHours = s.hours && Object.keys(s.hours).some(h => (s.hours[h].subject && s.hours[h].subject.trim() !== "") || (s.hours[h].memo && s.hours[h].memo.trim() !== ""));
+            return s.noClass || s.forceWork || hasMemo || hasHours;
+        }
+
         function renderCalendar(y, m) {
             const container = document.getElementById('calendar-days');
             if (!container) return;
@@ -240,6 +263,15 @@
                 const dw = new Date(y, m-1, d).getDay();
                 if (dw === 0 || holidays2026[dateStr.slice(5)]) div.classList.add('is-holiday');
                 if (dw === 6) div.classList.add('sat');
+                
+                // しるしを表示するか判定
+                if (hasDayMark(dateStr)) div.classList.add('has-mark');
+                
+                // 今日の判定
+                const today = new Date();
+                const todayStr = `2026-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                if (dateStr === todayStr) div.classList.add('is-today');
+
                 div.innerHTML = `<span>${d}</span>`;
                 div.onclick = () => selectDay(dateStr);
                 container.appendChild(div);
@@ -397,6 +429,7 @@
                 }
             }
             localStorage.setItem('sc_defaults', JSON.stringify(defaults));
+            renderCalendar(2026, currentMonth); // カレンダー更新
             selectDay(selectedDate); closeModal('config-modal');
         }
 
@@ -430,8 +463,15 @@
                 const mem = document.getElementById(`spm-${h}`).value;
                 if(sub || mem) s.hours[h] = { subject: sub, memo: mem };
             }
+            // 空データの場合は削除してしるしを消す
+            if (!s.noClass && !s.forceWork && !s.holidayMemo && Object.keys(s.hours).length === 0) {
+                delete specials[selectedDate];
+            }
+
             localStorage.setItem('sc_specials', JSON.stringify(specials));
-            selectDay(selectedDate); closeModal('day-modal');
+            renderCalendar(2026, currentMonth); // しるしを反映するために再描画
+            selectDay(selectedDate); 
+            closeModal('day-modal');
         }
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
