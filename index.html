@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>予定管理アプリ 2026年版</title>
+    <title>School Life Dashboard 2026</title>
     <style>
         :root {
             --primary: #3498db; --secondary: #2c3e50; --accent: #e74c3c;
@@ -23,8 +23,13 @@
             transition: 0.3s; z-index: 100; flex-shrink: 0;
         }
 
+        /* スマホ版サイドバーの修正 */
         @media (max-width: 768px) {
-            .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); }
+            .sidebar { 
+                position: fixed; left: 0; top: 0; bottom: 0; 
+                transform: translateX(-100%); 
+                padding-top: 80px; /* ヘッダーと重ならないよう上部に余白を追加 */
+            }
             .sidebar.active { transform: translateX(0); box-shadow: 2px 0 10px rgba(0,0,0,0.2); }
         }
 
@@ -39,7 +44,10 @@
             body { flex-direction: column; }
         }
 
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .calendar-grid { 
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center;
+        }
+        .calendar-header { font-weight: bold; padding-bottom: 5px; font-size: 0.9em; }
         .calendar-day { 
             aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; 
             justify-content: center; cursor: pointer; border-radius: 8px; font-size: 0.8em;
@@ -50,24 +58,17 @@
             background-color: var(--accent); border-radius: 50%;
         }
 
-        .is-holiday, .sun { color: var(--sun); font-weight: bold; }
+        .is-holiday, .sun { color: var(--sun); }
         .sat { color: var(--sat); }
         .current-selection { background: var(--primary) !important; color: white !important; }
         .current-selection.has-mark::after { background-color: white; }
         .is-today { border: 2px solid var(--today-border) !important; }
 
-        /* 新しいメモ表示エリアのスタイル */
         .daily-memo-card {
-            background: #fff9c4; /* 薄い黄色（付箋風） */
-            border-left: 5px solid #f1c40f;
-            padding: 12px 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            display: none; /* 初期は非表示 */
-            white-space: pre-wrap;
-            font-size: 0.95em;
-            line-height: 1.4;
+            background: #fff9c4; border-left: 5px solid #f1c40f;
+            padding: 12px 15px; margin-bottom: 15px; border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: none;
+            white-space: pre-wrap; font-size: 0.95em; line-height: 1.4;
         }
 
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
@@ -114,7 +115,13 @@
     <div class="sidebar" id="sidebar">
         <h3 style="margin:0 0 10px 0;">2026年 <select id="month-select" onchange="changeMonth()"></select></h3>
         <div class="calendar-grid">
-            <div style="color:var(--sun);text-align:center;">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div style="color:var(--sat);text-align:center;">土</div>
+            <div class="calendar-header sun">日</div>
+            <div class="calendar-header">月</div>
+            <div class="calendar-header">火</div>
+            <div class="calendar-header">水</div>
+            <div class="calendar-header">木</div>
+            <div class="calendar-header">金</div>
+            <div class="calendar-header sat">土</div>
             <div id="calendar-days" style="display: contents;"></div>
         </div>
         <button class="btn btn-main" style="background:var(--secondary);" onclick="openModal('config-modal')">⚙ 基本時間割を登録</button>
@@ -124,9 +131,7 @@
 
     <div class="main-content">
         <h2 id="view-date-label" style="margin-top:0;">日付を選択してください</h2>
-        
         <div id="day-memo-display" class="daily-memo-card"></div>
-
         <div id="workday-view">
             <table>
                 <thead><tr><th style="width:15%">限</th><th style="width:35%">科目</th><th>メモ</th></tr></thead>
@@ -193,17 +198,14 @@
 
     <script>
         const holidays2026 = {"01-01":"元日","01-12":"成人の日","02-11":"建国記念の日","02-23":"天皇誕生日","03-20":"春分の日","04-29":"昭和の日","05-03":"憲法記念日","05-04":"みどりの日","05-05":"こどもの日","05-06":"振替休日","07-20":"海の日","08-11":"山の日","09-21":"敬老の日","09-22":"国民の休日","09-23":"秋分の日","10-12":"スポーツの日","11-03":"文化の日","11-23":"勤労感謝の日"};
-
         let defaults = JSON.parse(localStorage.getItem('sc_defaults')) || {};
         let specials = JSON.parse(localStorage.getItem('sc_specials')) || {};
         let userSettings = JSON.parse(localStorage.getItem('sc_settings')) || { fontSize: '16px', customColors: [{name: '', color: '#ffffff'}] };
-
         let selectedDate = "";
         let currentMonth = new Date().getMonth() + 1;
 
         window.addEventListener('DOMContentLoaded', () => {
-            initMonthSelect(); applySettings();
-            renderCalendar(2026, currentMonth);
+            initMonthSelect(); applySettings(); renderCalendar(2026, currentMonth);
             const today = new Date();
             const todayStr = `2026-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
             selectDay(todayStr);
@@ -218,11 +220,7 @@
                 select.appendChild(opt);
             }
         }
-
-        function applySettings() {
-            document.documentElement.style.setProperty('--base-font-size', userSettings.fontSize);
-        }
-
+        function applySettings() { document.documentElement.style.setProperty('--base-font-size', userSettings.fontSize); }
         function hasDayMark(dateStr) {
             const s = specials[dateStr];
             if (!s) return false;
@@ -230,10 +228,8 @@
             const hasHours = s.hours && Object.keys(s.hours).some(h => (s.hours[h].subject && s.hours[h].subject.trim() !== "") || (s.hours[h].memo && s.hours[h].memo.trim() !== ""));
             return s.noClass || s.forceWork || hasMemo || hasHours;
         }
-
         function renderCalendar(y, m) {
             const container = document.getElementById('calendar-days');
-            if (!container) return;
             container.innerHTML = "";
             const firstDay = new Date(y, m-1, 1).getDay();
             const lastDate = new Date(y, m, 0).getDate();
@@ -241,87 +237,60 @@
             for (let d = 1; d <= lastDate; d++) {
                 const dateStr = `2026-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 const div = document.createElement('div');
-                div.className = 'calendar-day';
-                div.id = `cal-${dateStr}`;
+                div.className = 'calendar-day'; div.id = `cal-${dateStr}`;
                 const dw = new Date(y, m-1, d).getDay();
                 if (dw === 0 || holidays2026[dateStr.slice(5)]) div.classList.add('is-holiday');
                 if (dw === 6) div.classList.add('sat');
                 if (hasDayMark(dateStr)) div.classList.add('has-mark');
-                const today = new Date();
-                const todayStr = `2026-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                const todayStr = `2026-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`;
                 if (dateStr === todayStr) div.classList.add('is-today');
                 div.innerHTML = `<span>${d}</span>`;
                 div.onclick = () => selectDay(dateStr);
                 container.appendChild(div);
             }
         }
-
         function selectDay(dateStr) {
             selectedDate = dateStr;
             document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('current-selection'));
             const target = document.getElementById(`cal-${dateStr}`);
             if(target) target.classList.add('current-selection');
             document.getElementById('view-date-label').innerText = dateStr;
-            const dw = new Date(dateStr).getDay();
-            const s = specials[dateStr] || {};
+            const dw = new Date(dateStr).getDay(), s = specials[dateStr] || {};
             const isHol = !!holidays2026[dateStr.slice(5)];
             const isRest = ((isHol || dw === 0 || dw === 6) && !s.forceWork) || s.noClass;
-
-            // --- 追加：メモ表示のロジック ---
             const memoDisplay = document.getElementById('day-memo-display');
-            if (s.holidayMemo && s.holidayMemo.trim() !== "") {
-                memoDisplay.innerText = "📝 メモ: " + s.holidayMemo;
-                memoDisplay.style.display = 'block';
-            } else {
-                memoDisplay.style.display = 'none';
-            }
-
+            if (s.holidayMemo && s.holidayMemo.trim() !== "") { memoDisplay.innerText = "📝 メモ: " + s.holidayMemo; memoDisplay.style.display = 'block'; }
+            else { memoDisplay.style.display = 'none'; }
             if (isRest) {
                 document.getElementById('workday-view').style.display = 'none';
                 document.getElementById('holiday-view').style.display = 'block';
                 document.getElementById('holiday-memo').innerText = (isHol ? `【${holidays2026[dateStr.slice(5)]}】\n` : "") + (s.holidayMemo || "予定なし");
-                memoDisplay.style.display = 'none'; // 休日表示側ですでに出ているので隠す
+                memoDisplay.style.display = 'none';
             } else {
                 document.getElementById('workday-view').style.display = 'block';
                 document.getElementById('holiday-view').style.display = 'none';
                 const tbody = document.getElementById('timetable-body');
                 tbody.innerHTML = "";
                 for (let h = 1; h <= 7; h++) {
-                    const sp = specials[selectedDate]?.hours?.[h];
-                    const base = (defaults[dw] && defaults[dw][h]) ? defaults[dw][h].subject : '-';
+                    const sp = specials[selectedDate]?.hours?.[h], base = (defaults[dw] && defaults[dw][h]) ? defaults[dw][h].subject : '-';
                     const subject = (sp && sp.subject) ? sp.subject : base;
                     let style = "";
-                    if (userSettings.customColors) {
-                        userSettings.customColors.forEach(cfg => {
-                            if (cfg && cfg.name && subject === cfg.name) style = `background-color:${cfg.color}; color:white; font-weight:bold;`;
-                        });
-                    }
+                    if (userSettings.customColors) { userSettings.customColors.forEach(cfg => { if (cfg && cfg.name && subject === cfg.name) style = `background-color:${cfg.color}; color:white; font-weight:bold;`; }); }
                     tbody.innerHTML += `<tr><td>${h}</td><td style="${style}">${subject}</td><td>${sp?.memo || ""}</td></tr>`;
                 }
             }
         }
-
-        // --- モーダル・保存関連の既存関数 ---
-        function openModal(id) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.style.display = 'flex';
-                if(id === 'settings-modal') renderSettingsInputs();
-                if(id === 'config-modal') renderConfigGrid();
-            }
-        }
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; if(id === 'settings-modal') renderSettingsInputs(); if(id === 'config-modal') renderConfigGrid(); }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         function renderSettingsInputs() {
-            const area = document.getElementById('color-inputs-area');
-            area.innerHTML = "";
+            const area = document.getElementById('color-inputs-area'); area.innerHTML = "";
             userSettings.customColors.forEach((cfg, idx) => {
                 area.innerHTML += `<div class="color-row"><input type="text" id="name-${idx}" value="${cfg.name || ''}" placeholder="教科名"><input type="color" id="clr-${idx}" value="${cfg.color || '#ffffff'}"><button class="btn btn-del" onclick="removeSubjectSlot(${idx})">×</button></div>`;
             });
             document.getElementById('font-size-select').value = userSettings.fontSize;
         }
         function syncSettingsFromInputs() {
-            const size = document.getElementById('font-size-select').value;
-            const colors = [];
+            const size = document.getElementById('font-size-select').value, colors = [];
             userSettings.customColors.forEach((_, idx) => {
                 const n = document.getElementById(`name-${idx}`), c = document.getElementById(`clr-${idx}`);
                 if (n && c) colors.push({ name: n.value, color: c.value });
@@ -347,46 +316,36 @@
         }
         function saveDefaultSettings() {
             for (let dw = 1; dw <= 5; dw++) {
-                defaults[dw] = {};
-                for (let h = 1; h <= 7; h++) {
-                    const el = document.getElementById(`def-${dw}-${h}`);
-                    defaults[dw][h] = { subject: el ? el.value : '' };
+                defaults[dw] = {}; for (let h = 1; h <= 7; h++) {
+                    const el = document.getElementById(`def-${dw}-${h}`); defaults[dw][h] = { subject: el ? el.value : '' };
                 }
             }
             localStorage.setItem('sc_defaults', JSON.stringify(defaults)); renderCalendar(2026, currentMonth); selectDay(selectedDate); closeModal('config-modal');
         }
         function openDayEditModal() {
-            const area = document.getElementById('day-edit-inputs');
-            area.innerHTML = ""; const dw = new Date(selectedDate).getDay();
+            const area = document.getElementById('day-edit-inputs'); area.innerHTML = ""; const dw = new Date(selectedDate).getDay();
             for (let h = 1; h <= 7; h++) {
                 const sp = (specials[selectedDate] && specials[selectedDate].hours) ? (specials[selectedDate].hours[h] || {}) : {};
                 const placeholder = (defaults[dw] && defaults[dw][h]) ? defaults[dw][h].subject : '教科';
                 area.innerHTML += `<div style="display:grid;grid-template-columns:30px 1fr 2fr;gap:5px;margin-bottom:5px;"><div>${h}</div><input type="text" id="sph-${h}" value="${sp.subject || ''}" placeholder="${placeholder}"><input type="text" id="spm-${h}" value="${sp.memo || ''}" placeholder="メモ"></div>`;
             }
             const s = specials[selectedDate] || {};
-            document.getElementById('no-class-check').checked = !!s.noClass;
-            document.getElementById('force-work-check').checked = !!s.forceWork;
-            document.getElementById('day-memo-input').value = s.holidayMemo || "";
-            openModal('day-modal');
+            document.getElementById('no-class-check').checked = !!s.noClass; document.getElementById('force-work-check').checked = !!s.forceWork;
+            document.getElementById('day-memo-input').value = s.holidayMemo || ""; openModal('day-modal');
         }
         function saveDaySettings() {
-            if (!specials[selectedDate]) specials[selectedDate] = {};
-            const s = specials[selectedDate];
-            s.noClass = document.getElementById('no-class-check').checked;
-            s.forceWork = document.getElementById('force-work-check').checked;
-            s.holidayMemo = document.getElementById('day-memo-input').value;
-            s.hours = {};
+            if (!specials[selectedDate]) specials[selectedDate] = {}; const s = specials[selectedDate];
+            s.noClass = document.getElementById('no-class-check').checked; s.forceWork = document.getElementById('force-work-check').checked;
+            s.holidayMemo = document.getElementById('day-memo-input').value; s.hours = {};
             for (let h = 1; h <= 7; h++) {
                 const sub = document.getElementById(`sph-${h}`).value, mem = document.getElementById(`spm-${h}`).value;
                 if(sub || mem) s.hours[h] = { subject: sub, memo: mem };
             }
             if (!s.noClass && !s.forceWork && !s.holidayMemo && Object.keys(s.hours).length === 0) delete specials[selectedDate];
-            localStorage.setItem('sc_specials', JSON.stringify(specials));
-            renderCalendar(2026, currentMonth); selectDay(selectedDate); closeModal('day-modal');
+            localStorage.setItem('sc_specials', JSON.stringify(specials)); renderCalendar(2026, currentMonth); selectDay(selectedDate); closeModal('day-modal');
         }
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
         function changeMonth() { currentMonth = parseInt(document.getElementById('month-select').value); renderCalendar(2026, currentMonth); }
     </script>
 </body>
 </html>
-
